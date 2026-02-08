@@ -1,0 +1,46 @@
+@use '@/styles/globalColors' as *;
+
+.page { padding: 24px; max-width: 1200px; margin: 0 auto; }
+
+.header { margin-bottom: 24px; }
+.title { font-size: 28px; font-weight: 700; color: $color-text-primary; margin: 0 0 8px; }
+.subtitle { font-size: 16px; color: $color-text-muted; margin: 0; }
+
+.toolbar {
+  display: flex; flex-wrap: wrap; gap: 16px; align-items: center;
+  margin-bottom: 24px; padding: 16px;
+}
+
+.searchInput { flex: 1; min-width: 200px; }
+
+.statusFilters { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.loading, .empty {
+  padding: 48px; text-align: center; color: $color-text-muted;
+}
+
+.electionsList { display: flex; flex-direction: column; gap: 16px; }
+
+.electionCard {
+  padding: 20px; cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  &:hover { transform: translateY(-2px); }
+}
+
+.electionHeader { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 12px; }
+.electionTitle { font-size: 18px; font-weight: 600; color: $color-text-primary; margin: 0; }
+.electionDescription { color: $color-text-secondary; margin: 0 0 16px; line-height: 1.5; }
+
+.electionMeta { display: flex; flex-wrap: wrap; gap: 16px; }
+.metaItem {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 14px; color: $color-text-muted;
+  svg { color: $color-primary; }
+}
+
+.electionDetail { padding: 8px 0; }
+.detailStatus { margin-bottom: 16px; }
+.detailDescription { color: $color-text-secondary; line-height: 1.6; margin-bottom: 16px; }
+.detailDates { margin-bottom: 16px; color: $color-text-secondary; }
+.detailInfo { margin-bottom: 24px; color: $color-text-muted; font-size: 14px; p { margin: 4px 0; } }
+.detailActions { display: flex; gap: 12px; justify-content: flex-end; }

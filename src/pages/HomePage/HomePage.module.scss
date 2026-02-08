@@ -1,0 +1,203 @@
+@use '@/styles/globalColors' as *;
+@use '@/styles/variables' as *;
+@use '@/styles/mixins' as *;
+
+// Student-Voting: Официальный стиль с двойными рамками
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-2xl;
+}
+
+.welcome {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: $spacing-xl;
+  padding: $spacing-2xl;
+  background: $color-bg-primary;
+  border-radius: $radius-lg;
+  border: 2px solid $color-border-primary;
+  position: relative;
+  
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 6px;
+    border: 1px solid $color-border-light;
+    border-radius: calc($radius-lg - 6px);
+    pointer-events: none;
+  }
+  
+  @include mobile {
+    flex-direction: column;
+    text-align: center;
+    padding: $spacing-xl;
+  }
+}
+
+.welcomeContent {
+  position: relative;
+  z-index: 1;
+  max-width: 600px;
+}
+
+.welcomeTitle {
+  font-family: $font-family-primary;
+  font-size: $font-size-2xl;
+  font-weight: $font-weight-bold;
+  margin: 0 0 $spacing-md;
+  color: $color-primary;
+  
+  @include mobile { font-size: $font-size-xl; }
+}
+
+.welcomeText {
+  font-size: $font-size-base;
+  margin: 0 0 $spacing-lg;
+  line-height: $line-height-relaxed;
+  color: $color-text-secondary;
+}
+
+.welcomeDecor {
+  position: absolute;
+  right: $spacing-2xl;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 140px;
+  height: 140px;
+  color: $color-primary;
+  opacity: 0.08;
+  
+  @include mobile { display: none; }
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: $spacing-lg;
+  
+  @include tablet { grid-template-columns: repeat(2, 1fr); }
+  @include mobile { grid-template-columns: 1fr; }
+}
+
+.statCard {
+  display: flex;
+  align-items: center;
+  gap: $spacing-md;
+  padding: $spacing-lg !important;
+  border-radius: $radius-lg !important;
+  border: 2px solid $color-border-light !important;
+  position: relative;
+  
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 4px;
+    border: 1px solid $color-border-light;
+    border-radius: calc($radius-lg - 4px);
+    pointer-events: none;
+    transition: border-color $transition-fast;
+  }
+  
+  &:hover {
+    border-color: $color-primary !important;
+    &::before { border-color: $color-primary-light; }
+  }
+  
+  &.primary .statIcon { color: $color-primary; background: rgba($color-primary, 0.1); }
+  &.success .statIcon { color: $color-success; background: rgba($color-success, 0.1); }
+  &.warning .statIcon { color: $color-warning; background: rgba($color-warning, 0.1); }
+  &.info .statIcon { color: $color-info; background: rgba($color-info, 0.1); }
+}
+
+.statIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: $radius-md;
+  position: relative;
+  z-index: 1;
+  
+  svg { width: 24px; height: 24px; }
+}
+
+.statContent {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  z-index: 1;
+}
+
+.statValue {
+  font-family: $font-family-primary;
+  font-size: $font-size-2xl;
+  font-weight: $font-weight-bold;
+  color: $color-text-primary;
+}
+
+.statTitle {
+  font-size: $font-size-sm;
+  color: $color-text-muted;
+}
+
+.sectionTitle {
+  font-family: $font-family-primary;
+  font-size: $font-size-xl;
+  font-weight: $font-weight-semibold;
+  margin: 0 0 $spacing-lg;
+  color: $color-text-primary;
+}
+
+.actionCards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: $spacing-lg;
+}
+
+.actionCard {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: $spacing-sm;
+  padding: $spacing-xl !important;
+  border-radius: $radius-lg !important;
+  border: 2px solid $color-border-light !important;
+  position: relative;
+  
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 4px;
+    border: 1px solid $color-border-light;
+    border-radius: calc($radius-lg - 4px);
+    pointer-events: none;
+    transition: border-color $transition-fast;
+  }
+  
+  &:hover {
+    border-color: $color-primary !important;
+    &::before { border-color: $color-primary-light; }
+  }
+  
+  h3 { font-size: $font-size-lg; font-weight: $font-weight-semibold; color: $color-text-primary; margin: 0; position: relative; z-index: 1; }
+  p { font-size: $font-size-sm; color: $color-text-muted; margin: 0; position: relative; z-index: 1; }
+}
+
+.actionIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  background: rgba($color-primary, 0.1);
+  border-radius: $radius-md;
+  color: $color-primary;
+  margin-bottom: $spacing-sm;
+  position: relative;
+  z-index: 1;
+  
+  svg { width: 24px; height: 24px; }
+}

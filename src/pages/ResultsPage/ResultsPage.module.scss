@@ -1,0 +1,78 @@
+@use '@/styles/globalColors' as *;
+
+.page { padding: 24px; max-width: 1000px; margin: 0 auto; }
+
+.header { margin-bottom: 24px; }
+.title { font-size: 28px; font-weight: 700; color: $color-text-primary; margin: 0 0 8px; }
+.subtitle { font-size: 16px; color: $color-text-muted; margin: 0; }
+
+.toolbar {
+  display: flex; align-items: center; gap: 16px;
+  margin-bottom: 24px; padding: 16px;
+}
+
+.selectLabel { font-weight: 500; color: $color-text-secondary; white-space: nowrap; }
+.electionSelect { flex: 1; max-width: 400px; }
+
+.loading, .empty { padding: 48px; text-align: center; color: $color-text-muted; }
+
+.summaryCard {
+  margin-bottom: 24px; padding: 24px;
+  h2 { margin: 0 0 20px; color: $color-text-primary; }
+}
+
+.summaryStats { display: flex; gap: 32px; flex-wrap: wrap; }
+
+.statItem {
+  display: flex; flex-direction: column; align-items: center;
+  padding: 16px 24px; background: $color-bg-tertiary;
+  border-radius: 12px; min-width: 120px;
+}
+
+.statValue { font-size: 32px; font-weight: 700; color: $color-primary; }
+.statLabel { font-size: 14px; color: $color-text-muted; margin-top: 4px; }
+
+.resultsCard {
+  padding: 24px;
+  h3 { margin: 0 0 20px; color: $color-text-primary; }
+}
+
+.resultsTable { display: flex; flex-direction: column; gap: 12px; }
+
+.resultRow {
+  display: grid;
+  grid-template-columns: 48px 1fr 2fr auto;
+  align-items: center;
+  gap: 16px;
+  padding: 12px;
+  background: $color-bg-secondary;
+  border-radius: 8px;
+  
+  @media (max-width: 600px) {
+    grid-template-columns: 40px 1fr;
+    gap: 8px;
+    .barContainer { grid-column: 1 / -1; }
+  }
+}
+
+.rank { text-align: center; }
+.rankNumber { font-weight: 600; color: $color-text-muted; font-size: 14px; }
+
+.candidateInfo { display: flex; flex-direction: column; gap: 2px; }
+.candidateName { font-weight: 600; color: $color-text-primary; }
+.candidatePosition { font-size: 13px; color: $color-text-muted; }
+
+.barContainer {
+  height: 24px; background: $color-bg-tertiary;
+  border-radius: 12px; overflow: hidden;
+}
+
+.bar {
+  height: 100%; background: $gradient-primary;
+  border-radius: 12px;
+  transition: width 0.5s ease;
+}
+
+.voteInfo { text-align: right; min-width: 80px; }
+.voteCount { font-weight: 700; color: $color-text-primary; font-size: 18px; display: block; }
+.votePercent { font-size: 13px; color: $color-text-muted; }
