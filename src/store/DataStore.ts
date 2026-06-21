@@ -5,7 +5,9 @@ import {
   Candidate, CandidateFormData,
   Vote, VoteFormData, VoterRecord,
   ElectionResult, CandidateResult,
-  FilterParams 
+  FilterParams,
+  RegisteredUser,
+  VoterApprovalStatus,
 } from '@/types';
 import FirebaseService from '@/firebase';
 import { authStore } from './AuthStore';
@@ -14,11 +16,14 @@ export class DataStore {
   elections: Election[] = [];
   candidates: Candidate[] = [];
   votes: Vote[] = [];
-  voterRecords: VoterRecord[] = [];
+  registeredUsers: RegisteredUser[] = [];
+  /** voterRecords[electionId][voterId] */
+  voterRecords: Record<string, Record<string, VoterRecord>> = {};
 
   electionsLoading = false;
   candidatesLoading = false;
   votesLoading = false;
+  usersLoading = false;
 
   error: string | null = null;
   filters: FilterParams = {};
@@ -49,6 +54,10 @@ export class DataStore {
 
   get activeCandidates(): Candidate[] {
     return this.candidates.filter(c => c.isActive);
+  }
+
+  get pendingUsers(): RegisteredUser[] {
+    return this.registeredUsers.filter(u => u.status === 'pending');
   }
 
   get filteredElections(): Election[] {
@@ -109,12 +118,12 @@ export class DataStore {
   };
 
   getVoterRecord = (electionId: string, voterId: string): VoterRecord | undefined => {
-    return this.voterRecords.find(v => v.electionId === electionId && v.voterId === voterId);
+    return this.voterRecords[electionId]?.[voterId];
   };
 
   hasUserVoted = (electionId: string, voterId: string): boolean => {
     const record = this.getVoterRecord(electionId, voterId);
-    return record?.hasVoted || false;
+    return record?.hasVoted === true;
   };
 
   getElectionResults = (electionId: string): ElectionResult | null => {
@@ -124,8 +133,8 @@ export class DataStore {
     const candidates = this.getCandidatesForElection(electionId);
     const electionVotes = this.votes.filter(v => v.electionId === electionId && v.isActive);
     const totalVotes = electionVotes.length;
-    const votersForElection = this.voterRecords.filter(v => v.electionId === electionId);
-    const totalVoters = votersForElection.length || 1;
+    const electionRecords = this.voterRecords[electionId] ?? {};
+    const totalVoters = Object.keys(electionRecords).length || this.registeredUsers.filter(u => u.status === 'approved').length || 1;
 
     const candidateResults: CandidateResult[] = candidates.map((c, index) => ({
       candidateId: c.id,
@@ -155,6 +164,7 @@ export class DataStore {
       this.loadCandidates(),
       this.loadVotes(),
       this.loadVoterRecords(),
+      this.loadRegisteredUsers(),
     ]);
   };
 
@@ -208,12 +218,27 @@ export class DataStore {
 
   loadVoterRecords = async (): Promise<void> => {
     try {
-      const data = await FirebaseService.getData<Record<string, VoterRecord>>('voterRecords');
+      const data = await FirebaseService.getData<Record<string, Record<string, VoterRecord>>>('voterRecords');
       runInAction(() => {
-        this.voterRecords = data ? Object.values(data) : [];
+        this.voterRecords = data ?? {};
       });
     } catch {
       console.error('Error loading voter records');
+    }
+  };
+
+  loadRegisteredUsers = async (): Promise<void> => {
+    this.usersLoading = true;
+    try {
+      const data = await FirebaseService.getData<Record<string, RegisteredUser>>('users');
+      runInAction(() => {
+        this.registeredUsers = data ? Object.values(data) : [];
+        this.usersLoading = false;
+      });
+    } catch {
+      runInAction(() => {
+        this.usersLoading = false;
+      });
     }
   };
 
@@ -277,7 +302,9 @@ export class DataStore {
     try {
       await FirebaseService.updateData(`elections/${id}`, { status, updatedAt: new Date().toISOString() });
       runInAction(() => {
-        this.elections[index].status = status;
+        this.elections = this.elections.map(e =>
+          e.id === id ? { ...e, status, updatedAt: new Date().toISOString() } : e
+        );
       });
       return true;
     } catch {
@@ -370,53 +397,107 @@ export class DataStore {
     }
   };
 
-  // === VOTING ===
+  // === USER MANAGEMENT ===
 
-  castVote = async (data: VoteFormData): Promise<Vote | null> => {
-    if (!authStore.canVote()) return null;
+  updateUserStatus = async (userId: string, status: VoterApprovalStatus): Promise<boolean> => {
+    if (!authStore.canManageVoters()) return false;
 
-    const election = this.getElectionById(data.electionId);
-    if (!election || election.status !== 'active') return null;
-
-    if (this.hasUserVoted(data.electionId, data.voterId)) return null;
+    const index = this.registeredUsers.findIndex(u => u.id === userId);
+    if (index === -1) return false;
 
     const now = new Date().toISOString();
-    const vote: Vote = {
-      id: uuidv4(),
-      ...data,
-      votedAt: now,
-      isActive: true,
-    };
-
-    const voterRecord: VoterRecord = {
-      id: uuidv4(),
-      electionId: data.electionId,
-      voterId: data.voterId,
-      hasVoted: true,
-      votedAt: now,
-    };
 
     try {
-      await FirebaseService.setData(`votes/${vote.id}`, vote);
-      await FirebaseService.setData(`voterRecords/${voterRecord.id}`, voterRecord);
+      await FirebaseService.updateData(`users/${userId}`, { status, updatedAt: now });
+      runInAction(() => {
+        this.registeredUsers = this.registeredUsers.map(u =>
+          u.id === userId ? { ...u, status, updatedAt: now } : u
+        );
+      });
+
+      if (authStore.user.id === userId) {
+        await authStore.refreshVoterProfile();
+      }
+
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  // === VOTING ===
+
+  castVote = async (data: VoteFormData, voterId: string): Promise<'success' | 'already_voted' | 'error'> => {
+    if (!authStore.canVote()) return 'error';
+
+    const election = this.getElectionById(data.electionId);
+    if (!election || election.status !== 'active') return 'error';
+
+    if (this.hasUserVoted(data.electionId, voterId)) return 'already_voted';
+
+    const now = new Date().toISOString();
+    const recordPath = `voterRecords/${data.electionId}/${voterId}`;
+
+    try {
+      const txResult = await FirebaseService.runTransaction<VoterRecord>(
+        recordPath,
+        (current) => {
+          if (current?.hasVoted) return undefined;
+          return { hasVoted: true, votedAt: now };
+        },
+      );
+
+      if (!txResult.committed) {
+        runInAction(() => {
+          if (!this.voterRecords[data.electionId]) {
+            this.voterRecords[data.electionId] = {};
+          }
+          this.voterRecords[data.electionId][voterId] = txResult.snapshot ?? { hasVoted: true, votedAt: now };
+        });
+        return 'already_voted';
+      }
+
+      const vote: Vote = {
+        id: uuidv4(),
+        electionId: data.electionId,
+        candidateId: data.candidateId,
+        votedAt: now,
+        isActive: true,
+      };
+
+      try {
+        await FirebaseService.setData(`votes/${vote.id}`, vote);
+      } catch {
+        await FirebaseService.removeData(recordPath);
+        return 'error';
+      }
 
       const candidateIndex = this.candidates.findIndex(c => c.id === data.candidateId);
-      if (candidateIndex !== -1) {
-        const newCount = this.candidates[candidateIndex].votesCount + 1;
-        await FirebaseService.updateData(`candidates/${data.candidateId}`, { votesCount: newCount });
+      try {
+        if (candidateIndex !== -1) {
+          const newCount = this.candidates[candidateIndex].votesCount + 1;
+          await FirebaseService.updateData(`candidates/${data.candidateId}`, { votesCount: newCount });
+        }
+      } catch {
+        await FirebaseService.removeData(`votes/${vote.id}`);
+        await FirebaseService.removeData(recordPath);
+        return 'error';
       }
 
       runInAction(() => {
+        if (!this.voterRecords[data.electionId]) {
+          this.voterRecords[data.electionId] = {};
+        }
+        this.voterRecords[data.electionId][voterId] = { hasVoted: true, votedAt: now };
         this.votes.push(vote);
-        this.voterRecords.push(voterRecord);
         if (candidateIndex !== -1) {
           this.candidates[candidateIndex].votesCount++;
         }
       });
 
-      return vote;
+      return 'success';
     } catch {
-      return null;
+      return 'error';
     }
   };
 

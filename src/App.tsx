@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { observer } from 'mobx-react-lite';
-import { navigationStore, dataStore } from '@/store';
+import { navigationStore, dataStore, authStore } from '@/store';
 import { MainLayout, LoginModal, ConfirmModal, Toast } from '@/components';
 import { HomePage, ElectionsPage, CandidatesPage, ResultsPage, AdminPage } from '@/pages';
 
@@ -27,7 +27,9 @@ const PageRouter = observer(() => {
 
 const App = observer(() => {
   useEffect(() => {
+    const unsubscribe = authStore.initAuthListener();
     dataStore.loadAllData();
+    return unsubscribe;
   }, []);
 
   return (

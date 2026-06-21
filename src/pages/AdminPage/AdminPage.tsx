@@ -1,17 +1,18 @@
 import { useEffect, useState } from 'react';
 import { observer } from 'mobx-react-lite';
-import { dataStore, uiStore } from '@/store';
-import { Card, Button, Table, Modal, Input, Select } from '@/components/UI';
+import { dataStore, uiStore, authStore } from '@/store';
+import { Card, Button, Table, Modal, Input, Select, Badge } from '@/components/UI';
 import type { TableColumn } from '@/components/UI';
-import type { Election, Candidate, ElectionFormData, CandidateFormData, ElectionStatus } from '@/types';
+import type { Election, Candidate, ElectionFormData, CandidateFormData, ElectionStatus, RegisteredUser, VoterApprovalStatus } from '@/types';
 import styles from './AdminPage.module.scss';
 
-type AdminTab = 'elections' | 'candidates';
+type AdminTab = 'elections' | 'candidates' | 'voters';
 
 export const AdminPage = observer(() => {
   const { 
     elections, 
     candidates,
+    registeredUsers,
     activeElections,
     createElection,
     updateElection,
@@ -20,11 +21,14 @@ export const AdminPage = observer(() => {
     createCandidate,
     updateCandidate,
     deleteCandidate,
+    updateUserStatus,
     getElectionById,
     loadAllData,
     electionsLoading,
-    candidatesLoading
+    candidatesLoading,
+    usersLoading,
   } = dataStore;
+  const { canManageVoters } = authStore;
 
   const [activeTab, setActiveTab] = useState<AdminTab>('elections');
   const [modalOpen, setModalOpen] = useState(false);
@@ -154,6 +158,31 @@ export const AdminPage = observer(() => {
     uiStore.showSuccess('Статус обновлён');
   };
 
+  const handleUserStatusChange = async (userId: string, status: VoterApprovalStatus) => {
+    const success = await updateUserStatus(userId, status);
+    if (success) {
+      uiStore.showSuccess(status === 'approved' ? 'Пользователь подтверждён' : 'Статус пользователя обновлён');
+    } else {
+      uiStore.showError('Не удалось обновить статус пользователя');
+    }
+  };
+
+  const getUserStatusLabel = (status: VoterApprovalStatus): string => {
+    switch (status) {
+      case 'pending': return 'Ожидает';
+      case 'approved': return 'Подтверждён';
+      case 'rejected': return 'Отклонён';
+    }
+  };
+
+  const getUserStatusVariant = (status: VoterApprovalStatus): 'warning' | 'success' | 'error' => {
+    switch (status) {
+      case 'pending': return 'warning';
+      case 'approved': return 'success';
+      case 'rejected': return 'error';
+    }
+  };
+
   const electionOptions = activeElections.map(e => ({ value: e.id, label: e.title }));
   const statusOptions = [
     { value: 'draft', label: 'Черновик' },
@@ -169,10 +198,10 @@ export const AdminPage = observer(() => {
       key: 'status', 
       title: 'Статус',
       width: '150px',
-      render: (v: unknown, row: Election) => (
+      render: (_v: unknown, row: Election) => (
         <Select
           options={statusOptions}
-          value={v as string}
+          value={row.status}
           onChange={(e) => handleStatusChange(row.id, e.target.value as ElectionStatus)}
           className={styles.statusSelect}
         />
@@ -232,6 +261,46 @@ export const AdminPage = observer(() => {
     },
   ];
 
+  const voterColumns: TableColumn<RegisteredUser>[] = [
+    { key: 'name', title: 'ФИО' },
+    { key: 'email', title: 'Email' },
+    {
+      key: 'status',
+      title: 'Статус',
+      width: '140px',
+      render: (_v: unknown, row: RegisteredUser) => (
+        <Badge variant={getUserStatusVariant(row.status)}>
+          {getUserStatusLabel(row.status)}
+        </Badge>
+      ),
+    },
+    {
+      key: 'createdAt',
+      title: 'Дата регистрации',
+      width: '140px',
+      render: (v: unknown) => new Date(v as string).toLocaleDateString('ru-RU'),
+    },
+    {
+      key: 'actions',
+      title: '',
+      width: '180px',
+      render: (_: unknown, row: RegisteredUser) => (
+        <div className={styles.actions}>
+          {row.status !== 'approved' && (
+            <Button size="sm" variant="primary" onClick={() => handleUserStatusChange(row.id, 'approved')}>
+              Подтвердить
+            </Button>
+          )}
+          {row.status !== 'rejected' && (
+            <Button size="sm" variant="ghost" onClick={() => handleUserStatusChange(row.id, 'rejected')}>
+              Отклонить
+            </Button>
+          )}
+        </div>
+      ),
+    },
+  ];
+
   const getModalTitle = () => {
     const action = modalMode === 'create' ? 'Добавить' : 'Редактировать';
     const entity = activeTab === 'elections' ? 'выборы' : 'кандидата';
@@ -242,7 +311,7 @@ export const AdminPage = observer(() => {
     <div className={styles.page}>
       <div className={styles.header}>
         <h1 className={styles.title}>Управление</h1>
-        <p className={styles.subtitle}>Управление выборами и кандидатами</p>
+        <p className={styles.subtitle}>Управление выборами, кандидатами и избирателями</p>
       </div>
 
       <div className={styles.tabs}>
@@ -252,13 +321,20 @@ export const AdminPage = observer(() => {
         <button className={`${styles.tab} ${activeTab === 'candidates' ? styles.active : ''}`} onClick={() => setActiveTab('candidates')}>
           Кандидаты
         </button>
+        {canManageVoters() && (
+          <button className={`${styles.tab} ${activeTab === 'voters' ? styles.active : ''}`} onClick={() => setActiveTab('voters')}>
+            Избиратели
+          </button>
+        )}
       </div>
 
-      <Card className={styles.toolbar}>
-        <Button variant="primary" onClick={openCreateModal}>
-          Добавить {activeTab === 'elections' ? 'выборы' : 'кандидата'}
-        </Button>
-      </Card>
+      {activeTab !== 'voters' && (
+        <Card className={styles.toolbar}>
+          <Button variant="primary" onClick={openCreateModal}>
+            Добавить {activeTab === 'elections' ? 'выборы' : 'кандидата'}
+          </Button>
+        </Card>
+      )}
 
       <Card padding="none">
         {activeTab === 'elections' && (
@@ -266,6 +342,9 @@ export const AdminPage = observer(() => {
         )}
         {activeTab === 'candidates' && (
           <Table columns={candidateColumns} data={candidates.filter(c => c.isActive)} keyField="id" loading={candidatesLoading} emptyText="Нет кандидатов" />
+        )}
+        {activeTab === 'voters' && canManageVoters() && (
+          <Table columns={voterColumns} data={registeredUsers} keyField="id" loading={usersLoading} emptyText="Нет зарегистрированных избирателей" />
         )}
       </Card>
 

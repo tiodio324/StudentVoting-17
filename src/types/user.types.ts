@@ -2,11 +2,24 @@
 
 export type UserRole = 'voter' | 'moderator' | 'admin';
 
+export type VoterApprovalStatus = 'pending' | 'approved' | 'rejected';
+
+export interface RegisteredUser {
+  id: string;
+  email: string;
+  name: string;
+  status: VoterApprovalStatus;
+  role: 'voter';
+  createdAt: string;
+  updatedAt?: string;
+}
+
 export interface User {
   id?: string;
   role: UserRole;
   name?: string;
   email?: string;
+  approvalStatus?: VoterApprovalStatus;
 }
 
 export interface AuthCredentials {
@@ -24,7 +37,7 @@ export const ROLE_PERMISSIONS = {
     canViewElections: true,
     canViewCandidates: true,
     canViewResults: true,
-    canVote: true,
+    canVote: false,
     canManageElections: false,
     canManageCandidates: false,
     canManageVoters: false,
@@ -34,7 +47,7 @@ export const ROLE_PERMISSIONS = {
     canViewElections: true,
     canViewCandidates: true,
     canViewResults: true,
-    canVote: true,
+    canVote: false,
     canManageElections: true,
     canManageCandidates: true,
     canManageVoters: false,
@@ -44,7 +57,7 @@ export const ROLE_PERMISSIONS = {
     canViewElections: true,
     canViewCandidates: true,
     canViewResults: true,
-    canVote: true,
+    canVote: false,
     canManageElections: true,
     canManageCandidates: true,
     canManageVoters: true,

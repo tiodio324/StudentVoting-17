@@ -4,7 +4,15 @@ import { Button } from '@/components/UI';
 import styles from './Header.module.scss';
 
 export const Header = observer(() => {
-  const { isAuthenticated, currentRole, logout, openLoginModal } = authStore;
+  const {
+    isAuthenticated,
+    isStaffAuthenticated,
+    isVoterAuthenticated,
+    currentRole,
+    user,
+    logout,
+    openLoginModal,
+  } = authStore;
   const { pageTitle, toggleMobileMenu, mobileMenuOpen, navigate } = navigationStore;
 
   const getRoleName = (role: string): string => {
@@ -13,6 +21,10 @@ export const Header = observer(() => {
       case 'moderator': return 'Модератор';
       default: return 'Избиратель';
     }
+  };
+
+  const handleLogout = () => {
+    logout();
   };
 
   return (
@@ -55,13 +67,17 @@ export const Header = observer(() => {
       <div className={styles.right}>
         {isAuthenticated ? (
           <div className={styles.userInfo}>
-            <span className={styles.role}>{getRoleName(currentRole)}</span>
-            <Button variant="ghost" size="sm" onClick={logout} className={styles.headerButton}>
+            {isStaffAuthenticated ? (
+              <span className={styles.role}>{getRoleName(currentRole)}</span>
+            ) : isVoterAuthenticated ? (
+              <span className={styles.role}>{user.name || user.email}</span>
+            ) : null}
+            <Button variant="ghost" size="sm" onClick={handleLogout} className={styles.headerButton}>
               Выйти
             </Button>
           </div>
         ) : (
-          <Button variant="secondary" size="sm" onClick={openLoginModal} className={styles.headerButton}>
+          <Button variant="secondary" size="sm" onClick={() => openLoginModal('voter')} className={styles.headerButton}>
             Войти
           </Button>
         )}

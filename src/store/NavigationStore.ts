@@ -44,12 +44,13 @@ export class NavigationStore {
   get navigationItems(): PageConfig[] {
     return Object.values(PAGES_CONFIG).filter(page => {
       if (!page.showInNav) return false;
-      
-      // Check role requirements
+
+      if (page.requiresAuth && !authStore.isAuthenticated) return false;
+
       if (page.requiredRole) {
         return authStore.hasRole(page.requiredRole);
       }
-      
+
       return true;
     });
   }
@@ -57,22 +58,23 @@ export class NavigationStore {
   // Check if page is accessible
   canAccessPage = (pageId: PageId): boolean => {
     const page = PAGES_CONFIG[pageId];
-    
+
     if (!page.requiresAuth) return true;
-    if (!authStore.isAuthenticated) return false;
+
     if (page.requiredRole) {
+      if (!authStore.isStaffAuthenticated) return false;
       return authStore.hasRole(page.requiredRole);
     }
-    
-    return true;
+
+    return authStore.isAuthenticated;
   };
 
   // Navigate to page
   navigate = (pageId: PageId): void => {
     if (!this.canAccessPage(pageId)) {
-      // If can't access, show login modal or stay
-      if (PAGES_CONFIG[pageId].requiresAuth && !authStore.isAuthenticated) {
-        authStore.openLoginModal();
+      const page = PAGES_CONFIG[pageId];
+      if (page.requiresAuth && !authStore.isAuthenticated) {
+        authStore.openLoginModal(page.requiredRole ? 'staff' : 'voter');
       }
       return;
     }

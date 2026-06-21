@@ -5,6 +5,13 @@ import { Card, Button, Badge, Input, Select, Modal } from '@/components/UI';
 import type { Candidate } from '@/types';
 import styles from './CandidatesPage.module.scss';
 
+type VoteButtonState = {
+  show: boolean;
+  disabled: boolean;
+  label: string;
+  action: 'vote' | 'login' | 'none';
+};
+
 export const CandidatesPage = observer(() => {
   const { 
     filteredCandidates, 
@@ -17,10 +24,18 @@ export const CandidatesPage = observer(() => {
     setFilter,
     filters
   } = dataStore;
-  const { user, canVote } = authStore;
+  const {
+    canVote,
+    getVoterId,
+    isVoterAuthenticated,
+    isStaffAuthenticated,
+    isPendingApproval,
+    openLoginModal,
+  } = authStore;
   const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(null);
   const [voteModalOpen, setVoteModalOpen] = useState(false);
   const [votingCandidate, setVotingCandidate] = useState<Candidate | null>(null);
+  const [isSubmittingVote, setIsSubmittingVote] = useState(false);
 
   useEffect(() => {
     loadAllData();
@@ -31,40 +46,107 @@ export const CandidatesPage = observer(() => {
     ...activeElections.map(e => ({ value: e.id, label: e.title }))
   ];
 
-  const handleVoteClick = (candidate: Candidate) => {
+  const getVoteButtonState = (candidate: Candidate): VoteButtonState => {
     const election = getElectionById(candidate.electionId);
+    const voterId = getVoterId();
+
+    if (election?.status !== 'active') {
+      return { show: false, disabled: true, label: '', action: 'none' };
+    }
+
+    if (isStaffAuthenticated) {
+      return { show: false, disabled: true, label: '', action: 'none' };
+    }
+
+    if (voterId && hasUserVoted(candidate.electionId, voterId)) {
+      return { show: true, disabled: true, label: 'Вы уже проголосовали', action: 'none' };
+    }
+
+    if (!isVoterAuthenticated) {
+      return { show: true, disabled: false, label: 'Войти для голосования', action: 'login' };
+    }
+
+    if (isPendingApproval) {
+      return { show: true, disabled: true, label: 'Ожидает подтверждения администратора', action: 'none' };
+    }
+
+    if (!canVote()) {
+      return { show: true, disabled: true, label: 'Доступ к голосованию не подтверждён', action: 'none' };
+    }
+
+    return { show: true, disabled: false, label: 'Голосовать', action: 'vote' };
+  };
+
+  const handleVoteClick = (candidate: Candidate) => {
+    const buttonState = getVoteButtonState(candidate);
+
+    if (buttonState.action === 'login') {
+      openLoginModal('voter');
+      return;
+    }
+
+    if (buttonState.disabled || buttonState.action !== 'vote') {
+      return;
+    }
+
+    const election = getElectionById(candidate.electionId);
+    const voterId = getVoterId();
+
     if (!election || election.status !== 'active') {
       uiStore.showError('Голосование не активно');
       return;
     }
-    if (hasUserVoted(candidate.electionId, user.id || 'anonymous')) {
+    if (!voterId) {
+      openLoginModal('voter');
+      return;
+    }
+    if (hasUserVoted(candidate.electionId, voterId)) {
       uiStore.showError('Вы уже проголосовали в этих выборах');
       return;
     }
+
     setVotingCandidate(candidate);
     setVoteModalOpen(true);
   };
 
   const confirmVote = async () => {
-    if (!votingCandidate) return;
-    
-    const vote = await castVote({
+    if (!votingCandidate || isSubmittingVote) return;
+
+    const voterId = getVoterId();
+    if (!voterId) {
+      uiStore.showError('Необходимо войти в систему');
+      openLoginModal('voter');
+      return;
+    }
+
+    setIsSubmittingVote(true);
+
+    const result = await castVote({
       electionId: votingCandidate.electionId,
       candidateId: votingCandidate.id,
-      voterId: user.id || `voter_${Date.now()}`,
-    });
+    }, voterId);
 
-    if (vote) {
+    setIsSubmittingVote(false);
+
+    if (result === 'success') {
       uiStore.showSuccess('Ваш голос учтён!');
       setVoteModalOpen(false);
       setVotingCandidate(null);
+    } else if (result === 'already_voted') {
+      uiStore.showError('Вы уже проголосовали в этих выборах');
+      setVoteModalOpen(false);
+      setVotingCandidate(null);
     } else {
-      uiStore.showError('Ошибка при голосовании');
+      uiStore.showError('Ошибка при голосовании. Попробуйте позже');
     }
   };
 
   const getFullName = (c: Candidate) => 
     `${c.lastName} ${c.firstName}${c.middleName ? ' ' + c.middleName : ''}`;
+
+  const confirmButtonState = votingCandidate
+    ? getVoteButtonState(votingCandidate)
+    : null;
 
   return (
     <div className={styles.page}>
@@ -98,8 +180,7 @@ export const CandidatesPage = observer(() => {
         <div className={styles.candidatesList}>
           {filteredCandidates.map(candidate => {
             const election = getElectionById(candidate.electionId);
-            const canVoteNow = election?.status === 'active' && 
-              !hasUserVoted(candidate.electionId, user.id || 'anonymous');
+            const voteButton = getVoteButtonState(candidate);
             
             return (
               <Card 
@@ -131,13 +212,14 @@ export const CandidatesPage = observer(() => {
                   >
                     Подробнее
                   </Button>
-                  {canVote() && canVoteNow && (
+                  {voteButton.show && (
                     <Button 
-                      variant="primary" 
+                      variant={voteButton.action === 'login' ? 'secondary' : 'primary'}
                       size="sm"
+                      disabled={voteButton.disabled}
                       onClick={() => handleVoteClick(candidate)}
                     >
-                      Голосовать
+                      {voteButton.label}
                     </Button>
                   )}
                 </div>
@@ -147,7 +229,6 @@ export const CandidatesPage = observer(() => {
         </div>
       )}
 
-      {/* Candidate Detail Modal */}
       <Modal
         isOpen={!!selectedCandidate}
         onClose={() => setSelectedCandidate(null)}
@@ -181,18 +262,32 @@ export const CandidatesPage = observer(() => {
         )}
       </Modal>
 
-      {/* Vote Confirmation Modal */}
       <Modal
         isOpen={voteModalOpen}
         onClose={() => {
-          setVoteModalOpen(false);
-          setVotingCandidate(null);
+          if (!isSubmittingVote) {
+            setVoteModalOpen(false);
+            setVotingCandidate(null);
+          }
         }}
         title="Подтверждение голоса"
         footer={
           <div className={styles.modalFooter}>
-            <Button variant="ghost" onClick={() => setVoteModalOpen(false)}>Отмена</Button>
-            <Button variant="primary" onClick={confirmVote}>Подтвердить</Button>
+            <Button
+              variant="ghost"
+              onClick={() => setVoteModalOpen(false)}
+              disabled={isSubmittingVote}
+            >
+              Отмена
+            </Button>
+            <Button
+              variant="primary"
+              onClick={confirmVote}
+              loading={isSubmittingVote}
+              disabled={confirmButtonState?.disabled || isSubmittingVote}
+            >
+              {confirmButtonState?.disabled ? confirmButtonState.label : 'Подтвердить'}
+            </Button>
           </div>
         }
       >

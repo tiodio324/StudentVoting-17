@@ -49,15 +49,15 @@ export const HomePage = observer(() => {
           </h1>
           <p className={styles.welcomeText}>
             Платформа для проведения честных и прозрачных выборов в органы студенческого самоуправления.
-            {!isModerator && ' Войдите в систему для управления выборами.'}
+            {!authStore.isAuthenticated && ' Зарегистрируйтесь или войдите, чтобы принять участие в голосовании.'}
           </p>
           {!authStore.isAuthenticated && (
             <Button 
               variant="primary" 
               size="lg"
-              onClick={() => authStore.openLoginModal()}
+              onClick={() => authStore.openLoginModal('voter')}
             >
-              Войти в систему
+              Войти / Регистрация
             </Button>
           )}
         </div>

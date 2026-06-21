@@ -1,4 +1,5 @@
 import { ReactNode } from 'react';
+import { observer } from 'mobx-react-lite';
 import styles from './Table.module.scss';
 
 export interface TableColumn<T> {
@@ -21,7 +22,7 @@ interface TableProps<T> {
   onRowClick?: (row: T) => void;
 }
 
-export const Table = <T extends object>({
+function TableInner<T extends object>({
   columns,
   data,
   keyField,
@@ -31,7 +32,7 @@ export const Table = <T extends object>({
   hoverable = true,
   compact = false,
   onRowClick,
-}: TableProps<T>) => {
+}: TableProps<T>) {
   const tableClasses = [
     styles.table,
     striped ? styles.striped : '',
@@ -108,4 +109,6 @@ export const Table = <T extends object>({
       </table>
     </div>
   );
-};
+}
+
+export const Table = observer(TableInner) as typeof TableInner;

@@ -7,6 +7,7 @@ const DEFAULT_TOAST_DURATION = 4000;
 export class UIStore {
   // Toast notifications
   toasts: Toast[] = [];
+  persistentToastId: string | null = null;
 
   // Modal states
   confirmModalState: ModalState & { 
@@ -72,8 +73,26 @@ export class UIStore {
     return this.showToast('info', message);
   };
 
+  showPersistentWarning = (message: string): string => {
+    if (this.persistentToastId) {
+      this.removeToast(this.persistentToastId);
+    }
+    this.persistentToastId = this.showToast('warning', message, 0);
+    return this.persistentToastId;
+  };
+
+  clearPersistentToast = (): void => {
+    if (this.persistentToastId) {
+      this.removeToast(this.persistentToastId);
+      this.persistentToastId = null;
+    }
+  };
+
   removeToast = (id: string): void => {
     this.toasts = this.toasts.filter(t => t.id !== id);
+    if (this.persistentToastId === id) {
+      this.persistentToastId = null;
+    }
   };
 
   clearAllToasts = (): void => {
